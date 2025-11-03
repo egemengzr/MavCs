@@ -55,7 +55,7 @@ public sealed class FrameV2 : FrameBase
         
         // CRC over header (starting at len) and payload
         ushort crc = 0xFFFF;
-        for (int i = 1; i < 1 + Constants.HeaderV2Size; i++)
+        for (int i = 2; i < 1 + Constants.HeaderV2Size; i++)
             crc = Crc.Accumulate(crc, input[i]);
 
         ReadOnlySpan<byte> payloadSpan = input.Slice(1 + Constants.HeaderV2Size, len);
@@ -115,7 +115,7 @@ public sealed class FrameV2 : FrameBase
         
         // CRC
         ushort crc = 0xFFFF;
-        for (int i = 1; i < header.Length; i++)
+        for (int i = 2; i < header.Length; i++)
             crc = Crc.Accumulate(crc, header[i]);
         
         if (len > 0 && frame.Payload is not null)
