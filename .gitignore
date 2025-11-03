@@ -27,6 +27,7 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+.DS_Store
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -51,8 +52,7 @@ CodeCoverage/
 # NUnit
 *.VisualState.xml
 TestResult.xml
-<<<<<<< HEAD
 nunit-*.xml
-=======
-nunit-*.xml
->>>>>>> 9423977f60b7bb756d3059e39e04eba52787b0fb
+
+# IDE
+.idea* 
