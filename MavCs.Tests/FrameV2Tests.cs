@@ -1,18 +1,13 @@
 using System.Buffers;
 using MavCs.Core.Protocol;
 using MavCs.Core.Runtime;
+using MavCs.Core.Registry;
 using Xunit;
 
 namespace MavCs.Tests;
 
 public class FrameV2Tests
 {
-    private static byte GetExtra(uint msgId) => msgId switch
-    {
-        0 => 50, // Heartbeat
-        _ => 0
-    };
-
     [Fact]
     public void V2_Roundtrip_Succeeds()
     {
@@ -28,9 +23,9 @@ public class FrameV2Tests
         };
 
         var buffer = new ArrayBufferWriter<byte>();
-        FrameV2.Write(frame, buffer, GetExtra);
+        FrameV2.Write(frame, buffer, id => 50);
 
-        var decoder = new MavLinkDecoder(GetExtra);
+        var decoder = new MavLinkDecoder(new KnownMessages());
         bool ok = decoder.TryReadFrame(buffer.WrittenSpan, out var parsed, out int consumed);
         
         Assert.True(ok);

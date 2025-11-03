@@ -11,11 +11,21 @@ public sealed class MavLinkDecoder : IMavLinkDecoder
 {
     private readonly Func<uint, byte>? _crcExtraProvider;
 
-    public MavLinkDecoder(Func<uint, byte>? crcExtraProvider = null)
+    // New: accept registry and wrap it as provider
+    public MavLinkDecoder(IMessageRegistry? registry = null)
     {
-        this._crcExtraProvider = crcExtraProvider;
+        if (registry is not null)
+        {
+            _crcExtraProvider = id => registry.GetCrcExtra(id) ?? 0;
+        }
     }
-
+    
+    // Back-compat ctor.
+    public MavLinkDecoder(Func<uint, byte>? crcExtraProvider)
+    {
+        _crcExtraProvider = crcExtraProvider;
+    }
+    
     public bool TryReadFrame(ReadOnlySpan<byte> input, out FrameBase? frame, out int bytesConsumed)
     {
         frame = null;
