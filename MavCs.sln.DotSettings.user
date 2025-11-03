@@ -8,6 +8,7 @@
       &lt;TestId&gt;xUnit::2AED5E5C-8A86-40DC-948A-CE80873C92AD::net9.0::MavCs.Tests.FrameV2Tests&lt;/TestId&gt;
       &lt;TestId&gt;xUnit::2AED5E5C-8A86-40DC-948A-CE80873C92AD::net9.0::MavCs.Tests.FrameV1Tests.V1_Roundtrip_Succeeds&lt;/TestId&gt;
       &lt;TestId&gt;xUnit::2AED5E5C-8A86-40DC-948A-CE80873C92AD::net9.0::MavCs.Tests.RegistryTest&lt;/TestId&gt;
+      &lt;TestId&gt;xUnit::2AED5E5C-8A86-40DC-948A-CE80873C92AD::net9.0::MavCs.Tests.HeartbeatSerializerTests&lt;/TestId&gt;
     &lt;/TestAncestor&gt;
   &lt;/Or&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
