@@ -1,6 +1,6 @@
 namespace MavCs.Core.Protocol;
 
-public class Crc
+public static class Crc
 {
     // Mavlink uses CRC-16/X25 (polly 0x1021), init 0xFFFF, xor out 0x0000
     public static ushort Compute(ReadOnlySpan<byte> data)
@@ -20,7 +20,7 @@ public class Crc
         return (ushort)~crc;        // ones-complement
     }
     
-    // For adding "extra CRC" byte for Mavlink
+    // For adding "extra CRC" byte for Mavlink data
     public static ushort Accumulate(ushort current, byte b)
     {
         ushort crc = current;
