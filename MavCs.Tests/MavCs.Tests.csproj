@@ -22,4 +22,10 @@
       <ProjectReference Include="..\MavCs.Core\MavCs.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="Integrations\MavLinkEncoderTests.cs">
+        <DependentUpon>HeartbeatEndToEndTests.cs</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
 </Project>
