@@ -15,17 +15,46 @@ public ref struct LESpanReader
 
     public int BytesConsumed => this._pos;
 
+    private void Ensure(int n)
+    {
+        if (this._pos + n > this._src.Length)
+            throw new ArgumentOutOfRangeException(nameof(_src));
+    }
     public byte ReadByte()
     {
-        if (this._pos >= this._src.Length) throw new ArgumentOutOfRangeException(nameof(this._src));
+        this.Ensure(1);
         return this._src[this._pos++];
+    }
+
+    public sbyte ReadSByte()
+    {
+        this.Ensure(1);
+        return unchecked((sbyte)this._src[this._pos++]);
+    }
+
+    public ushort ReadUInt16()
+    {
+        this.Ensure(2);
+        ushort v = (ushort)(this._src[this._pos] | (this._src[this._pos + 1] << 8));
+        this._pos += 2;
+        return v;
+    }
+
+    public short ReadInt16()
+    {
+        this.Ensure(2);
+        short v = (short)(this._src[this._pos] | (this._src[this._pos + 1] << 8));
+        this._pos += 2;
+        return v;
     }
 
     public uint ReadUInt32()
     {
-        if (this._pos + 4 > this._src.Length) throw new ArgumentOutOfRangeException(nameof(this._src));
-        uint v = (uint)(this._src[this._pos] | (this._src[this._pos + 1] << 8) | (this._src[this._pos + 2] << 16) 
-                        | (this._src[this._pos + 3] << 24));
+        this.Ensure(4);
+        uint v = (uint)(this._src[this._pos] | 
+                        (this._src[this._pos + 1] << 8) | 
+                        (this._src[this._pos + 2] << 16) | 
+                        (this._src[this._pos + 3] << 24));
         this._pos += 4;
         return v;
     }

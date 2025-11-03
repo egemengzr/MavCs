@@ -17,19 +17,44 @@ public ref struct LESpanWriter
 
     public int BytesWritten => this._pos;
 
+    private void Ensure(int n)
+    {
+        if (this._pos + n > this._dst.Length)
+            throw new ArgumentOutOfRangeException(nameof(this._dst));
+    }
+
     public void WriteByte(byte value)
     {
-        if (this._pos >= this._dst.Length) throw new ArgumentOutOfRangeException(nameof(this._dst));
+        this.Ensure(1);
         this._dst[this._pos++] = value;
+    }
+
+    public void WriteSByte(sbyte value)
+    {
+        this.Ensure(1);
+        this._dst[this._pos++] = (byte)value;
+    }
+
+    public void WriteUInt16(ushort value)
+    {
+        this.Ensure(2);
+        this._dst[this._pos++] = (byte)(value & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 8) & 0xFF);
+    }
+
+    public void WriteInt16(short value)
+    {
+        this.Ensure(2);
+        this._dst[this._pos++] = (byte)(value & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 8) & 0xFF);
     }
 
     public void WriteUIint32(uint value)
     {
-        if (_pos + 4 > _dst.Length) throw new ArgumentOutOfRangeException(nameof(this._dst));
-        this._dst[this._pos + 0] = (byte)(value & 0xFF);
-        this._dst[this._pos + 1] = (byte)((value >> 8) & 0xFF);
-        this._dst[this._pos + 2] = (byte)((value >> 16) & 0xFF);
-        this._dst[this._pos + 3] = (byte)((value >> 24) & 0xFF);
-        this._pos += 4;
+        this.Ensure(4);
+        this._dst[this._pos++] = (byte)(value & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 8) & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 16) & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 24) & 0xFF);
     }
 }
