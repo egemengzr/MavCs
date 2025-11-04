@@ -1,7 +1,7 @@
 using MavCs.Core.Messages;
 using MavCs.Core.Serialization;
 
-namespace MavCs.Tests;
+namespace MavCs.Tests.Applets;
 
 public class HeartbeatSerializerTests
 {

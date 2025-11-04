@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace MavCs.Tests;
+namespace MavCs.Tests.Applets;
 
 public class HelloTests
 {

@@ -4,7 +4,7 @@ using MavCs.Core.Runtime;
 using MavCs.Core.Registry;
 using Xunit;
 
-namespace MavCs.Tests;
+namespace MavCs.Tests.Applets;
 
 public class FrameV2Tests
 {

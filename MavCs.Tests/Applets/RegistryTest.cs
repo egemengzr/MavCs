@@ -1,6 +1,6 @@
 using MavCs.Core.Registry;
 
-namespace MavCs.Tests;
+namespace MavCs.Tests.Applets;
 
 public class RegistryTest
 {

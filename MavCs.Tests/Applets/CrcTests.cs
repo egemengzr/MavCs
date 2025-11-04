@@ -1,23 +1,20 @@
 using MavCs.Core.Protocol;
 using Xunit;
 
-namespace MavCs.Tests;
+namespace MavCs.Tests.Applets;
 
 public class CrcTests
 {
     [Fact]
     public void Crc_Computes_KnownVector()
     {
-        // Random data
-        byte[] data = { 0xFE, 0x09, 0x01, 0x01, 0x01, 0x00 };
-        ushort crc = Crc.Compute(data);
-        
-        // Same input equal same output
-        ushort crc2 = Crc.Compute(data);
-        Assert.Equal(crc, crc2);
-        
-        // If it changes it must be different
-        ushort crc3 = Crc.Compute(new byte[] { 0xFE, 0x09, 0x01 });
-        Assert.NotEqual(crc, crc3);
+        // Known MAVLink CRC for "123456789" = 0x906E (standard X25 check value)
+        var data = System.Text.Encoding.ASCII.GetBytes("123456789");
+
+        ushort crc = Crc.Reset();
+        crc = Crc.AccumulateSpan(crc, data);
+        crc = Crc.Finalize(crc);
+
+        Assert.Equal(0x906E, crc);  // ✅ standard check value
     }
 }
