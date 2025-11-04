@@ -1,5 +1,4 @@
 using System.Buffers;
-
 using MavCs.Core.Messages;
 using MavCs.Core.Registry;
 using MavCs.Core.Runtime;
@@ -24,17 +23,26 @@ public class TransportTests
         const int A = 14560;
         const int B = 14561;
 
-        await using var recv = new MavLinkUdpTransport(localPort: A, remoteHost: "127.0.0.1", remotePort: B);
-        await using var send = new MavLinkUdpTransport(localPort: B, remoteHost: "127.0.0.1", remotePort: A);
+        await using var recv = new MavLinkUdpTransport(host: "127.0.0.1", remotePort: B, localPort: A);
+        await using var send = new MavLinkUdpTransport(host: "127.0.0.1", remotePort: A, localPort: B);
 
-        await recv.StartAsync();
-        await send.StartAsync();
+        await recv.StartAsync(CancellationToken.None);
+        await send.StartAsync(CancellationToken.None);
 
         var tcs = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-        recv.FrameReceived += (s, data) => tcs.TrySetResult(data.ToArray());
+
+        // Staring async listening on background
+        _ = Task.Run(async () =>
+        {
+            await foreach (var data in recv.ReceiveAsync(CancellationToken.None))
+            {
+                tcs.TrySetResult(data.ToArray());
+                break;
+            }
+        });
 
         byte[] payload = { 1, 2, 3, 4, 5 };
-        await send.SendAsync(payload);
+        await send.SendAsync(payload, CancellationToken.None);
 
         var received = await WaitOrThrow(tcs.Task, TimeSpan.FromSeconds(1));
         Assert.Equal(payload, received);
@@ -46,11 +54,11 @@ public class TransportTests
         const int A = 14570;
         const int B = 14571;
 
-        await using var recv = new MavLinkUdpTransport(localPort: A, remoteHost: "127.0.0.1", remotePort: B);
-        await using var send = new MavLinkUdpTransport(localPort: B, remoteHost: "127.0.0.1", remotePort: A);
+        await using var recv = new MavLinkUdpTransport(host: "127.0.0.1", remotePort: B, localPort: A);
+        await using var send = new MavLinkUdpTransport(host: "127.0.0.1", remotePort: A, localPort: B);
 
-        await recv.StartAsync();
-        await send.StartAsync();
+        await recv.StartAsync(CancellationToken.None);
+        await send.StartAsync(CancellationToken.None);
 
         // Prepare a Heartbeat message
         var msg = new HeartbeatMessage
@@ -68,9 +76,18 @@ public class TransportTests
         encoder.WriteV1(msg, sequence: 1, systemId: 1, componentId: 1, output: buf);
 
         var tcs = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-        recv.FrameReceived += (s, data) => tcs.TrySetResult(data.ToArray());
 
-        await send.SendAsync(buf.WrittenMemory);
+        // Async listening
+        _ = Task.Run(async () =>
+        {
+            await foreach (var data in recv.ReceiveAsync(CancellationToken.None))
+            {
+                tcs.TrySetResult(data.ToArray());
+                break;
+            }
+        });
+
+        await send.SendAsync(buf.WrittenMemory, CancellationToken.None);
 
         var received = await WaitOrThrow(tcs.Task, TimeSpan.FromSeconds(1));
 
@@ -80,6 +97,5 @@ public class TransportTests
         var factory = new MavMessageFactory();
         Assert.True(factory.TryDeserializeFrame(frame!, out var obj));
         Assert.IsType<HeartbeatMessage>(obj);
-
     }
 }
