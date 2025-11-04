@@ -17,27 +17,37 @@ class Program
         Console.WriteLine("🚀 MavCs Live Test Suite");
         Console.WriteLine("→ UDP link: 127.0.0.1:14550 ⇄ 127.0.0.1:14551\n");
 
+        using var cts = new CancellationTokenSource();
+        var ct = cts.Token;
+
         await using var udp = new MavLinkUdpTransport(
-            localPort: 14550,       // listen to vehicle
-            remoteHost: "127.0.0.1",
-            remotePort: 14551       // send to vehicle
+            host: "127.0.0.1",
+            remotePort: 14551,   // send to vehicle
+            localPort: 14550     // listen from vehicle
         );
 
-        Console.WriteLine($"Listening at {udp.LocalEndpoint}");
-        udp.FrameReceived += OnFrameReceived;
-        await udp.StartAsync();
+        await udp.StartAsync(ct);
+        Console.WriteLine("Listening...");
+
+        // Arka planda RX loop
+        _ = Task.Run(async () =>
+        {
+            await foreach (var data in udp.ReceiveAsync(ct))
+            {
+                OnFrame(data);
+            }
+        }, ct);
 
         // ===========================
         // ✳️ TEST PLAN
         // ===========================
-        
-        // await SendHeartbeatLoop(udp);
-        await SendSysStatusLoop(udp);
-        // await SendCustomTest(udp);
+        await SendHeartbeatLoop(udp, ct);
+        // await SendSysStatusLoop(udp, ct);
+        // await SendCustomTest(udp, ct);
     }
 
-    // ============ 🔹 EVENT HANDLER ================
-    private static void OnFrameReceived(object? sender, ReadOnlyMemory<byte> frame)
+    // ============ 🔹 FRAME HANDLER ================
+    private static void OnFrame(ReadOnlyMemory<byte> frame)
     {
         var hex = BitConverter.ToString(frame.Span.ToArray());
         Console.WriteLine($"⬅️ Raw: {hex}");
@@ -46,7 +56,7 @@ class Program
         if (decoder.TryReadFrame(frame.Span, out var parsed, out _))
         {
             var factory = new MavMessageFactory();
-            if (factory.TryDeserializeFrame(parsed!, out var msg))
+            if (parsed is not null && factory.TryDeserializeFrame(parsed, out var msg) && msg is not null)
             {
                 switch (msg)
                 {
@@ -63,6 +73,10 @@ class Program
                         break;
                 }
             }
+            else
+            {
+                Console.WriteLine("⬅️ Decoding failed (factory).");
+            }
         }
         else
         {
@@ -72,12 +86,12 @@ class Program
 
     // ============ 🔹 TEST CASES ================
 
-    private static async Task SendHeartbeatLoop(MavLinkUdpTransport udp)
+    private static async Task SendHeartbeatLoop(MavLinkUdpTransport udp, CancellationToken ct)
     {
         Console.WriteLine("💓 Starting HEARTBEAT loop...");
         byte seq = 0;
 
-        while (true)
+        while (!ct.IsCancellationRequested)
         {
             var hb = new HeartbeatMessage
             {
@@ -91,18 +105,18 @@ class Program
 
             Buf.Clear();
             Encoder.WriteV2(hb, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory);
+            await udp.SendAsync(Buf.WrittenMemory, ct);
             Console.WriteLine("➡️ Sent HEARTBEAT");
-            await Task.Delay(1000);
+            await Task.Delay(1000, ct);
         }
     }
 
-    private static async Task SendSysStatusLoop(MavLinkUdpTransport udp)
+    private static async Task SendSysStatusLoop(MavLinkUdpTransport udp, CancellationToken ct)
     {
         Console.WriteLine("🔋 Starting SYS_STATUS loop...");
         byte seq = 0;
 
-        while (true)
+        while (!ct.IsCancellationRequested)
         {
             var sys = new SysStatusMessage
             {
@@ -117,13 +131,13 @@ class Program
 
             Buf.Clear();
             Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory);
+            await udp.SendAsync(Buf.WrittenMemory, ct);
             Console.WriteLine("➡️ Sent SYS_STATUS");
-            await Task.Delay(1000);
+            await Task.Delay(1000, ct);
         }
     }
 
-    private static async Task SendCustomTest(MavLinkUdpTransport udp)
+    private static async Task SendCustomTest(MavLinkUdpTransport udp, CancellationToken ct)
     {
         Console.WriteLine("🧩 Running custom one-shot test...");
 
@@ -138,7 +152,7 @@ class Program
 
         Buf.Clear();
         Encoder.WriteV1(msg, sequence: 1, systemId: 1, componentId: 1, output: Buf);
-        await udp.SendAsync(Buf.WrittenMemory);
+        await udp.SendAsync(Buf.WrittenMemory, ct);
 
         Console.WriteLine("✅ Sent custom HEARTBEAT once");
     }
