@@ -106,7 +106,7 @@ public sealed class FrameV2 : FrameBase
         
         // CRC
         ushort crc = Crc.Reset();
-        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV2Size)); // include len!
+        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV2Size));
 
         if (len > 0 && frame.Payload is not null)
             crc = Crc.AccumulateSpan(crc, frame.Payload);
@@ -127,6 +127,5 @@ public sealed class FrameV2 : FrameBase
 
         if (!signature.IsEmpty)
             writer.Write(signature);
-
     }
 }

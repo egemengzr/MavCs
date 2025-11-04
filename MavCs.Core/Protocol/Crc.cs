@@ -33,7 +33,6 @@ public static class Crc
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ushort Finalize(ushort current) => (ushort)~current;
 
-    // Tam blok hesaplamak istersen:
     public static ushort Compute(ReadOnlySpan<byte> data)
         => Finalize(AccumulateSpan(Reset(), data));
 }
