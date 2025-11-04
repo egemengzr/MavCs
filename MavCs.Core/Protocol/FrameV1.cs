@@ -39,30 +39,22 @@ public sealed class FrameV1 : FrameBase
         byte comp = input[4];
         byte msgId = input[5];
         
-        // Compute CRC over header (from len) + payload
-        ushort crc = 0xFFFF;
-        for (int i = 1; i < 1 + Constants.HeaderV1Size; i++)
-            crc = Crc.Accumulate(crc, input[i]);
+        // CRC starts from len (exclude magic=0xFE)
+        ushort crc = Crc.Reset();
+        crc = Crc.AccumulateSpan(crc, input.Slice(1, Constants.HeaderV1Size));
 
-        ReadOnlySpan<byte> payloadSpan = input.Slice(1 + Constants.HeaderV1Size, len);
-        foreach (byte b in payloadSpan)
-            crc = Crc.Accumulate(crc, b);
+        // payload
+        var payloadSpan = input.Slice(1 + Constants.HeaderV1Size, len);
+        crc = Crc.AccumulateSpan(crc, payloadSpan);
+
+        // crc_extra
         if (crcExtraProvider is not null)
-        {
-            byte extra = crcExtraProvider(msgId);
-            crc = Crc.Accumulate(crc, extra);
-        }
-        
-        // Finalize CRC (one's complement)
-        crc = (ushort)~crc;
-        
-        // Extract CRC from frame (little-endian)
+            crc = Crc.AccumulateByte(crc, crcExtraProvider(msgId));
+
+
         int crcIndex = total - Constants.CrcSize;
         ushort crcFrame = (ushort)(input[crcIndex] | (input[crcIndex + 1] << 8));
         if (crc != crcFrame) return false;
-        
-        // Slice payload
-        byte[] payload = payloadSpan.ToArray();
 
         frame = new FrameV1()
         {
@@ -70,7 +62,7 @@ public sealed class FrameV1 : FrameBase
             SystemId = sys,
             ComponentId = comp,
             MessageId = msgId,
-            Payload = payload
+            Payload = payloadSpan.ToArray()
         };
 
         bytesConsumed = total;
@@ -92,22 +84,15 @@ public sealed class FrameV1 : FrameBase
         header[5] = (byte)frame.MessageId;
         
         // Compute CRC
-        ushort crc = 0xFFFF;
-        for (int i = 1; i < header.Length; i++)
-            crc = Crc.Accumulate(crc, header[i]);
-
+        ushort crc = Crc.Reset();
+        
+        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV1Size)); // exclude magic
         if (len > 0 && frame.Payload is not null)
-        {
-            foreach (byte b in frame.Payload)
-                crc = Crc.Accumulate(crc, b);
-        }
+            crc = Crc.AccumulateSpan(crc, frame.Payload);
 
         if (crcExtraProvider is not null)
-        {
-            byte extra = crcExtraProvider(frame.MessageId);
-            crc = Crc.Accumulate(crc, extra);
-        }
-        crc = (ushort)~crc;
+            crc = Crc.AccumulateByte(crc, crcExtraProvider(frame.MessageId));
+
         
         // Write out
         var writer = output;

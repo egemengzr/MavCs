@@ -1,27 +1,15 @@
+using System.Runtime.CompilerServices;
+
 namespace MavCs.Core.Protocol;
 
 public static class Crc
 {
-    // Mavlink uses CRC-16/X25 (polly 0x1021), init 0xFFFF, xor out 0x0000
-    public static ushort Compute(ReadOnlySpan<byte> data)
-    {
-        ushort crc = 0xFFFF;
-        foreach (byte b in data)
-        {
-            crc ^= b;
-            for (int i = 0; i < 8; i++)
-            {
-                bool lsb = (crc & 1) != 0;
-                crc >>= 1;
-                if (lsb)
-                    crc ^= 0x8408;  // reversed 0x1021
-            }
-        }
-        return (ushort)~crc;        // ones-complement
-    }
     
-    // For adding "extra CRC" byte for Mavlink data
-    public static ushort Accumulate(ushort current, byte b)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ushort Reset() => 0xFFFF;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ushort AccumulateByte(ushort current, byte b)
     {
         ushort crc = current;
         crc ^= b;
@@ -29,9 +17,23 @@ public static class Crc
         {
             bool lsb = (crc & 1) != 0;
             crc >>= 1;
-            if (lsb) crc ^= 0x8408;
+            if (lsb) crc ^= 0x8408; // reflected 0x1021
         }
-
         return crc;
     }
+
+    public static ushort AccumulateSpan(ushort current, ReadOnlySpan<byte> data)
+    {
+        ushort crc = current;
+        foreach (var b in data)
+            crc = AccumulateByte(crc, b);
+        return crc;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ushort Finalize(ushort current) => (ushort)~current;
+
+    // Tam blok hesaplamak istersen:
+    public static ushort Compute(ReadOnlySpan<byte> data)
+        => Finalize(AccumulateSpan(Reset(), data));
 }

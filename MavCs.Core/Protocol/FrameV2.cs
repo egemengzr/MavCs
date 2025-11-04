@@ -43,7 +43,6 @@ public sealed class FrameV2 : FrameBase
         byte seq = input[4];
         byte sys = input[5];
         byte comp = input[6];
-        
         uint msgId = (uint)(input[7] | (input[8] << 8) | (input[9] << 16));
 
         int baseTotal = 1 + Constants.HeaderV2Size + len + Constants.CrcSize;
@@ -53,31 +52,23 @@ public sealed class FrameV2 : FrameBase
         int total = baseTotal + (hasSignature ? Constants.V2SignatureSize : 0);
         if (input.Length < total) return false;
         
-        // CRC over header (starting at len) and payload
-        ushort crc = 0xFFFF;
-        for (int i = 2; i < 1 + Constants.HeaderV2Size; i++)
-            crc = Crc.Accumulate(crc, input[i]);
+        ushort crc = Crc.Reset();
+        // Start from incompat_flags (skip magic and len)
+        crc = Crc.AccumulateSpan(crc, input.Slice(1, Constants.HeaderV2Size));
 
-        ReadOnlySpan<byte> payloadSpan = input.Slice(1 + Constants.HeaderV2Size, len);
-        foreach (byte b in payloadSpan)
-            crc = Crc.Accumulate(crc, b);
+        var payloadSpan = input.Slice(1 + Constants.HeaderV2Size, len);
+        crc = Crc.AccumulateSpan(crc, payloadSpan);
 
         if (crcExtraProvider is not null)
-        {
-            byte extra = crcExtraProvider(msgId);
-            crc = Crc.Accumulate(crc, extra);
-        }
-        crc = (ushort)~crc;
-
+            crc = Crc.AccumulateByte(crc, crcExtraProvider(msgId));
+        
         int crcIndex = 1 + Constants.HeaderV2Size + len;
         ushort crcFrame = (ushort)(input[crcIndex] | (input[crcIndex + 1] << 8));
         if (crc != crcFrame) return false;
         
         ReadOnlyMemory<byte> sig = ReadOnlyMemory<byte>.Empty;
         if (hasSignature)
-        {
             sig = input.Slice(crcIndex + 2, Constants.V2SignatureSize).ToArray();
-        }
 
         frame = new FrameV2()
         {
@@ -114,25 +105,20 @@ public sealed class FrameV2 : FrameBase
         header[9] = (byte)((frame.MessageId >> 16) & 0xFF);
         
         // CRC
-        ushort crc = 0xFFFF;
-        for (int i = 2; i < header.Length; i++)
-            crc = Crc.Accumulate(crc, header[i]);
-        
+        ushort crc = Crc.Reset();
+        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV2Size)); // include len!
+
         if (len > 0 && frame.Payload is not null)
-            foreach (byte b in frame.Payload)
-                crc = Crc.Accumulate(crc, b);
+            crc = Crc.AccumulateSpan(crc, frame.Payload);
 
         if (crcExtraProvider is not null)
-        {
-            byte extra = crcExtraProvider(frame.MessageId);
-            crc = Crc.Accumulate(crc, extra);
-        }
-        crc = (ushort)~crc;
+            crc = Crc.AccumulateByte(crc, crcExtraProvider(frame.MessageId));
         
         // Write
         var writer = output;
         writer.Write(header);
-        if (len > 0 && frame.Payload is not null) writer.Write(frame.Payload);
+        if (len > 0 && frame.Payload is not null)
+            writer.Write(frame.Payload);
 
         Span<byte> crcBytes = stackalloc byte[2];
         crcBytes[0] = (byte)(crc & 0xFF);
@@ -140,9 +126,7 @@ public sealed class FrameV2 : FrameBase
         writer.Write(crcBytes);
 
         if (!signature.IsEmpty)
-        {
-            // Caller is responsible for setting incompat flag bit0
             writer.Write(signature);
-        }
+
     }
 }
