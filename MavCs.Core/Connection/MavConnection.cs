@@ -40,8 +40,10 @@ public sealed class MavConnection : IAsyncDisposable
         IMavTransport transport = spec.Kind switch
         {
             ConnectionKind.Udp => new MavLinkUdpTransport(spec.Host!, spec.RemotePort!.Value, spec.LocalPort!.Value),
-            // ConnectionKind.Serial => new SerialTransport(spec.PortName!, spec.Baud!.Value),
+            ConnectionKind.Serial => new MavLinkSerialTransport(spec.PortName!, spec.Baud!.Value),
+            // ConnectionKind.Tcp => new MavLinkTcpTransport(spec.Host!, spec.RemotePort!.Value),
             _ => throw new NotSupportedException("Unknown connection kind")
+
         };
         
         var conn = new MavConnection(transport, spec.SysId, spec.CompId);
@@ -62,7 +64,7 @@ public sealed class MavConnection : IAsyncDisposable
             output: buffer
         );
 
-        // Asıl veriyi gönder: buffer.WrittenMemory
+        // Send data : buffer.WrittenMemory
         await _transport.SendAsync(buffer.WrittenMemory, ct);
 
     }
@@ -99,7 +101,7 @@ public sealed class MavConnection : IAsyncDisposable
                 }
             }
         }
-        catch (OperationCanceledException) { /* normal shutdown */ }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             // TODO: OnError event
