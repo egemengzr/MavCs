@@ -71,4 +71,13 @@ public ref struct LESpanWriter
         uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
         this.WriteUInt32(bits);
     }
+    
+    public void WriteInt32(int value)
+    {
+        this.Ensure(4);
+        this._dst[this._pos++] = (byte)(value & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 8) & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 16) & 0xFF);
+        this._dst[this._pos++] = (byte)((value >> 24) & 0xFF);
+    }
 }

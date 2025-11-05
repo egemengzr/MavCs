@@ -45,7 +45,8 @@ class Program
         // await SendHeartbeatLoop(udp, ct);
         // await SendSysStatusLoop(udp, ct);
         // await SendStatustextLoop(udp, ct);
-        await SendAttitudeLoop(udp, ct);
+        // await SendAttitudeLoop(udp, ct);
+        await SendGlobalPositionIntLoop(udp, ct);
         // await SendCustomTest(udp, ct);
     }
 
@@ -184,6 +185,33 @@ class Program
             Encoder.WriteV2(att, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
             await udp.SendAsync(Buf.WrittenMemory, ct);
             Console.WriteLine(" Sent ATTITUDE");
+            await Task.Delay(1000, ct);
+        }
+    }
+
+    private static async Task SendGlobalPositionIntLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    {
+        Console.WriteLine(" Starting GLOBAL_POSITION_INT Loop");
+        byte seq = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            var pos = new GlobalPositionIntMessage
+            {
+                TimeBootMs = 0,
+                Lat = 1,
+                Lon = 2,
+                Alt = 3,
+                RelativeAlt = 4,
+                Vx = 5,
+                Vy = 6,
+                Vz = 7,
+                Hdg = 8
+            };
+            
+            Buf.Clear();
+            Encoder.WriteV2(pos, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
+            await udp.SendAsync(Buf.WrittenMemory, ct);
+            Console.WriteLine(" Sent GLOBAL_POSITION_INT");
             await Task.Delay(1000, ct);
         }
     }

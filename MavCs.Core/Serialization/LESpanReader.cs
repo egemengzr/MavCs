@@ -73,4 +73,15 @@ public ref struct LESpanReader
         uint bits = this.ReadUInt32();
         return BitConverter.Int32BitsToSingle(unchecked((int)bits));
     }
+    
+    public int ReadInt32()
+    {
+        this.Ensure(4);
+        int v = this._src[this._pos] |
+                (this._src[this._pos + 1] << 8) |
+                (this._src[this._pos + 2] << 16) |
+                (this._src[this._pos + 3] << 24);
+        this._pos += 4;
+        return v;
+    }
 }
