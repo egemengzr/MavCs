@@ -30,6 +30,5 @@ public class HeartbeatSerializerTests
         Assert.Equal(src.BaseMode,       dst.BaseMode);
         Assert.Equal(src.SystemStatus,   dst.SystemStatus);
         Assert.Equal(src.MavlinkVersion, dst.MavlinkVersion);
-
     }
 }

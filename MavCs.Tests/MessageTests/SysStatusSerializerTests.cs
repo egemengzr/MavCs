@@ -1,7 +1,7 @@
 using MavCs.Core.Messages;
 using MavCs.Core.Serialization;
 
-namespace MavCs.Tests.Applets;
+namespace MavCs.Tests.MessageTests;
 
 /*
  *
