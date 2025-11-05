@@ -57,4 +57,11 @@ public ref struct LESpanWriter
         this._dst[this._pos++] = (byte)((value >> 16) & 0xFF);
         this._dst[this._pos++] = (byte)((value >> 24) & 0xFF);
     }
+    
+    public void WriteBytes(ReadOnlySpan<byte> src)
+    {
+        this.Ensure(src.Length);
+        src.CopyTo(this._dst.Slice(this._pos, src.Length));
+        this._pos += src.Length;
+    }
 }

@@ -58,4 +58,12 @@ public ref struct LESpanReader
         this._pos += 4;
         return v;
     }
+    
+    public ReadOnlySpan<byte> ReadBytes(int count)
+    {
+        this.Ensure(count);
+        var slice = _src.Slice(_pos, count);
+        this._pos += count;
+        return slice;
+    }
 }

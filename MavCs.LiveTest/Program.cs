@@ -1,4 +1,6 @@
 ﻿using System.Buffers;
+using System.Diagnostics;
+
 using MavCs.Core.Messages;
 using MavCs.Core.Registry;
 using MavCs.Core.Runtime;
@@ -29,7 +31,6 @@ class Program
         await udp.StartAsync(ct);
         Console.WriteLine("Listening...");
 
-        // Arka planda RX loop
         _ = Task.Run(async () =>
         {
             await foreach (var data in udp.ReceiveAsync(ct))
@@ -41,8 +42,9 @@ class Program
         // ===========================
         // ✳️ TEST PLAN
         // ===========================
-        await SendHeartbeatLoop(udp, ct);
+        // await SendHeartbeatLoop(udp, ct);
         // await SendSysStatusLoop(udp, ct);
+        await SendStatustextLoop(udp, ct);
         // await SendCustomTest(udp, ct);
     }
 
@@ -133,6 +135,29 @@ class Program
             Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
             await udp.SendAsync(Buf.WrittenMemory, ct);
             Console.WriteLine("➡️ Sent SYS_STATUS");
+            await Task.Delay(1000, ct);
+        }
+    }
+
+    private static async Task SendStatustextLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    {
+        Console.WriteLine(" Starting STATUSTEXT loop");
+        byte seq = 0;
+
+        while (!ct.IsCancellationRequested)
+        {
+            var sys = new StatustextMessage
+            {
+                Severity = 5,
+                Text = "testatestatestatestatestatestatestatestatestatesta",
+                Id = 25,
+                ChunkSeq = seq
+            };
+            
+            Buf.Clear();
+            Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
+            await udp.SendAsync(Buf.WrittenMemory, ct);
+            Console.WriteLine(" Sent STATUSTEXT");
             await Task.Delay(1000, ct);
         }
     }
