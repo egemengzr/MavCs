@@ -17,7 +17,7 @@ public sealed class HeartbeatSerializer : IMessageSerializer<HeartbeatMessage>
         var w = new LESpanWriter(dst);
         
         // Wire order
-        w.WriteUIint32(message.CustomMode);
+        w.WriteUInt32(message.CustomMode);
         w.WriteByte(message.Type);
         w.WriteByte(message.Autopilot);
         w.WriteByte(message.BaseMode);

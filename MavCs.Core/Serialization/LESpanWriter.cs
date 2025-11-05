@@ -49,7 +49,7 @@ public ref struct LESpanWriter
         this._dst[this._pos++] = (byte)((value >> 8) & 0xFF);
     }
 
-    public void WriteUIint32(uint value)
+    public void WriteUInt32(uint value)
     {
         this.Ensure(4);
         this._dst[this._pos++] = (byte)(value & 0xFF);
@@ -63,5 +63,12 @@ public ref struct LESpanWriter
         this.Ensure(src.Length);
         src.CopyTo(this._dst.Slice(this._pos, src.Length));
         this._pos += src.Length;
+    }
+    
+    public void WriteFloat(float value)
+    {
+        // Get IEEE-754 bytes, write as LE 
+        uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+        this.WriteUInt32(bits);
     }
 }

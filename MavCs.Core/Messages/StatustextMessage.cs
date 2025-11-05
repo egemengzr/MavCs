@@ -12,7 +12,7 @@ namespace MavCs.Core.Messages;
  */
 
 [MavMessage(Id = 253u, CrcExtra = 83, Name = "STATUSTEXT")]
-public class StatustextMessage
+public sealed class StatustextMessage
 {
     // Wire Order
     public byte Severity { get; set; }

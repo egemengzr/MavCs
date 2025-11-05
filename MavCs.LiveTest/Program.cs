@@ -44,7 +44,8 @@ class Program
         // ===========================
         // await SendHeartbeatLoop(udp, ct);
         // await SendSysStatusLoop(udp, ct);
-        await SendStatustextLoop(udp, ct);
+        // await SendStatustextLoop(udp, ct);
+        await SendAttitudeLoop(udp, ct);
         // await SendCustomTest(udp, ct);
     }
 
@@ -158,6 +159,31 @@ class Program
             Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
             await udp.SendAsync(Buf.WrittenMemory, ct);
             Console.WriteLine(" Sent STATUSTEXT");
+            await Task.Delay(1000, ct);
+        }
+    }
+
+    private static async Task SendAttitudeLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    {
+        Console.WriteLine(" Starting ATTITUDE Loop");
+        byte seq = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            var att = new AttitudeMessage
+            {
+                TimeBootMs = 1234,
+                Roll = (float)2.1,
+                Pitch = (float)3.2,
+                Yaw = (float)1.1,
+                RollSpeed = (float)0.2,
+                PitchSpeed = (float)0.1,
+                YawSpeed = (float)0.3
+            };
+            
+            Buf.Clear();
+            Encoder.WriteV2(att, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
+            await udp.SendAsync(Buf.WrittenMemory, ct);
+            Console.WriteLine(" Sent ATTITUDE");
             await Task.Delay(1000, ct);
         }
     }

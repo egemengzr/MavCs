@@ -62,8 +62,15 @@ public ref struct LESpanReader
     public ReadOnlySpan<byte> ReadBytes(int count)
     {
         this.Ensure(count);
-        var slice = _src.Slice(_pos, count);
+        var slice = this._src.Slice(this._pos, count);
         this._pos += count;
         return slice;
+    }
+    
+    public float ReadFloat()
+    {
+        // Read 4 bytes as LE and convert to IEEE-754
+        uint bits = this.ReadUInt32();
+        return BitConverter.Int32BitsToSingle(unchecked((int)bits));
     }
 }
