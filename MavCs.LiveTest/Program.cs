@@ -1,6 +1,4 @@
 ﻿using System.Buffers;
-using System.Diagnostics;
-
 using MavCs.Core.Messages;
 using MavCs.Core.Registry;
 using MavCs.Core.Runtime;
@@ -11,228 +9,115 @@ namespace MavCs.LiveTest;
 class Program
 {
     private static readonly KnownMessages Registry = new();
-    private static readonly MavLinkEncoder Encoder = new(Registry);
-    private static readonly ArrayBufferWriter<byte> Buf = new();
+    
+    private static readonly MessageDispatcher Dispatcher = new();
 
     static async Task Main()
     {
-        Console.WriteLine("🚀 MavCs Live Test Suite");
-        Console.WriteLine("→ UDP link: 127.0.0.1:14550 ⇄ 127.0.0.1:14551\n");
+        Console.WriteLine("🚀 MavCs Live Listener (Polymorphic Dispatch)");
+        Console.WriteLine("→ Listening on 127.0.0.1:14550...\n");
+
+        RegisterHandlers();
 
         using var cts = new CancellationTokenSource();
         var ct = cts.Token;
 
         await using var udp = new MavLinkUdpTransport(
-            host: "127.0.0.1",
-            remotePort: 14551,   // send to vehicle
-            localPort: 14550     // listen from vehicle
+            host: "127.0.0.1", 
+            localPort: 14550, 
+            remotePort: 14551
         );
 
         await udp.StartAsync(ct);
-        Console.WriteLine("Listening...");
-
-        _ = Task.Run(async () =>
-        {
-            await foreach (var data in udp.ReceiveAsync(ct))
-            {
-                OnFrame(data);
-            }
-        }, ct);
-
-        // ===========================
-        // ✳️ TEST PLAN
-        // ===========================
-        // await SendHeartbeatLoop(udp, ct);
-        // await SendSysStatusLoop(udp, ct);
-        // await SendStatustextLoop(udp, ct);
-        // await SendAttitudeLoop(udp, ct);
-        await SendGlobalPositionIntLoop(udp, ct);
-        // await SendCustomTest(udp, ct);
-    }
-
-    // ============ 🔹 FRAME HANDLER ================
-    private static void OnFrame(ReadOnlyMemory<byte> frame)
-    {
-        var hex = BitConverter.ToString(frame.Span.ToArray());
-        Console.WriteLine($"⬅️ Raw: {hex}");
 
         var decoder = new MavLinkDecoder(Registry);
-        if (decoder.TryReadFrame(frame.Span, out var parsed, out _))
+        var factory = new MavMessageFactory();
+
+        await foreach (var frameBuffer in udp.ReceiveAsync(ct))
         {
-            var factory = new MavMessageFactory();
-            if (parsed is not null && factory.TryDeserializeFrame(parsed, out var msg) && msg is not null)
+            if (decoder.TryReadFrame(frameBuffer.Span, out var header, out _))
             {
-                switch (msg)
+                if (header is not null && factory.TryDeserializeFrame(header, out var msg) && msg is not null)
                 {
-                    case HeartbeatMessage hb:
-                        Console.WriteLine($"⬅️ HEARTBEAT sys={parsed.SystemId} comp={parsed.ComponentId} type={hb.Type}");
-                        break;
-
-                    case SysStatusMessage ss:
-                        Console.WriteLine($"⬅️ SYS_STATUS vbat={ss.VoltageBattery}mV load={ss.Load / 10.0:F1}% batt={ss.BatteryRemaining}%");
-                        break;
-
-                    default:
-                        Console.WriteLine($"⬅️ Decoded: {msg.GetType().Name}");
-                        break;
+                    Dispatcher.Dispatch(msg);
                 }
             }
-            else
-            {
-                Console.WriteLine("⬅️ Decoding failed (factory).");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"⬅️ Failed to parse ({frame.Length} bytes)");
         }
     }
-
-    // ============ 🔹 TEST CASES ================
-
-    private static async Task SendHeartbeatLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    private static void RegisterHandlers()
     {
-        Console.WriteLine("💓 Starting HEARTBEAT loop...");
-        byte seq = 0;
+        Dispatcher.Subscribe<HeartbeatMessage>(OnHeartbeat);
+        Dispatcher.Subscribe<SysStatusMessage>(OnSysStatus);
+        Dispatcher.Subscribe<BatteryStatusMessage>(OnBatteryStatus);
+        Dispatcher.Subscribe<GpsRawIntMessage>(OnGpsRawInt);
+        Dispatcher.Subscribe<AttitudeMessage>(OnAttitude);
+        Dispatcher.Subscribe<StatustextMessage>(OnStatusText);
+        
+        Dispatcher.Subscribe<VfrHudMessage>(msg => 
+            Console.WriteLine($"✈️  HUD: Speed {msg.Airspeed:F1} m/s, Alt {msg.Alt:F1} m"));
+        
+        Dispatcher.Subscribe<AutopilotVersionMessage>(msg => 
+            Console.WriteLine($"🧠 AUTOPILOT  | Board: {msg.BoardVersion} | Vendor: {msg.VendorId} | Product: {msg.ProductId}"));
+        
+        Dispatcher.Subscribe<ParamValueMessage>(OnParamValue);
 
-        while (!ct.IsCancellationRequested)
-        {
-            var hb = new HeartbeatMessage
-            {
-                Type = 6,
-                Autopilot = 8,
-                BaseMode = 0x81,
-                CustomMode = 0x11223344u,
-                SystemStatus = 4,
-                MavlinkVersion = 3
-            };
-
-            Buf.Clear();
-            Encoder.WriteV2(hb, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory, ct);
-            Console.WriteLine("➡️ Sent HEARTBEAT");
-            await Task.Delay(1000, ct);
-        }
-    }
-
-    private static async Task SendSysStatusLoop(MavLinkUdpTransport udp, CancellationToken ct)
-    {
-        Console.WriteLine("🔋 Starting SYS_STATUS loop...");
-        byte seq = 0;
-
-        while (!ct.IsCancellationRequested)
-        {
-            var sys = new SysStatusMessage
-            {
-                OnboardControlSensorsPresent = 0,
-                OnboardControlSensorsEnabled = 0,
-                OnboardControlSensorsHealth = 0,
-                Load = 150,              // 15.0%
-                VoltageBattery = 12000,  // 12V
-                CurrentBattery = 120,    // 1.2A
-                BatteryRemaining = 85
-            };
-
-            Buf.Clear();
-            Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory, ct);
-            Console.WriteLine("➡️ Sent SYS_STATUS");
-            await Task.Delay(1000, ct);
-        }
-    }
-
-    private static async Task SendStatustextLoop(MavLinkUdpTransport udp, CancellationToken ct)
-    {
-        Console.WriteLine(" Starting STATUSTEXT loop");
-        byte seq = 0;
-
-        while (!ct.IsCancellationRequested)
-        {
-            var sys = new StatustextMessage
-            {
-                Severity = 5,
-                Text = "testatestatestatestatestatestatestatestatestatesta",
-                Id = 25,
-                ChunkSeq = seq
-            };
+        Dispatcher.Subscribe<MissionCountMessage>(msg => 
+            Console.WriteLine($"🗺️  MISSION    | Waypoint Count: {msg.Count} | Type: {msg.MissionType}"));
             
-            Buf.Clear();
-            Encoder.WriteV2(sys, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory, ct);
-            Console.WriteLine(" Sent STATUSTEXT");
-            await Task.Delay(1000, ct);
-        }
+        Dispatcher.Subscribe<MissionItemIntMessage>(OnMissionItem);
+        
     }
 
-    private static async Task SendAttitudeLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    
+    private static void OnParamValue(ParamValueMessage msg)
     {
-        Console.WriteLine(" Starting ATTITUDE Loop");
-        byte seq = 0;
-        while (!ct.IsCancellationRequested)
-        {
-            var att = new AttitudeMessage
-            {
-                TimeBootMs = 1234,
-                Roll = (float)2.1,
-                Pitch = (float)3.2,
-                Yaw = (float)1.1,
-                RollSpeed = (float)0.2,
-                PitchSpeed = (float)0.1,
-                YawSpeed = (float)0.3
-            };
-            
-            Buf.Clear();
-            Encoder.WriteV2(att, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory, ct);
-            Console.WriteLine(" Sent ATTITUDE");
-            await Task.Delay(1000, ct);
-        }
+        Console.WriteLine($"⚙️  PARAM      | {msg.ParamIndex + 1}/{msg.ParamCount} | {msg.ParamId} : {msg.ParamValue}");
     }
 
-    private static async Task SendGlobalPositionIntLoop(MavLinkUdpTransport udp, CancellationToken ct)
+    private static void OnMissionItem(MissionItemIntMessage msg)
     {
-        Console.WriteLine(" Starting GLOBAL_POSITION_INT Loop");
-        byte seq = 0;
-        while (!ct.IsCancellationRequested)
-        {
-            var pos = new GlobalPositionIntMessage
-            {
-                TimeBootMs = 0,
-                Lat = 1,
-                Lon = 2,
-                Alt = 3,
-                RelativeAlt = 4,
-                Vx = 5,
-                Vy = 6,
-                Vz = 7,
-                Hdg = 8
-            };
-            
-            Buf.Clear();
-            Encoder.WriteV2(pos, sequence: seq++, systemId: 255, componentId: 190, output: Buf);
-            await udp.SendAsync(Buf.WrittenMemory, ct);
-            Console.WriteLine(" Sent GLOBAL_POSITION_INT");
-            await Task.Delay(1000, ct);
-        }
+        Console.WriteLine($"📍 WAYPOINT   | Seq: {msg.Seq} | Cmd: {msg.Command} | X: {msg.X} | Y: {msg.Y} | Z: {msg.Z}");
+    }
+    
+    private static void OnHeartbeat(HeartbeatMessage msg)
+    {
+        Console.WriteLine($"💓 HEARTBEAT | Mode: {msg.BaseMode} | Status: {msg.SystemStatus}");
     }
 
-    private static async Task SendCustomTest(MavLinkUdpTransport udp, CancellationToken ct)
+    private static void OnSysStatus(SysStatusMessage msg)
     {
-        Console.WriteLine("🧩 Running custom one-shot test...");
+        Console.WriteLine($"⚡ SYS_STATUS | Load: {msg.Load/10.0}% | Batt: {msg.VoltageBattery}mV");
+    }
 
-        var msg = new HeartbeatMessage
-        {
-            Type = 6,
-            Autopilot = 8,
-            BaseMode = 0x80,
-            SystemStatus = 4,
-            MavlinkVersion = 3
-        };
+    private static void OnBatteryStatus(BatteryStatusMessage msg)
+    {
+        var cell1 = (msg.Voltages != null && msg.Voltages.Length > 0) ? msg.Voltages[0] : 0;
+        Console.WriteLine($"🔋 BATTERY    | Rem: {msg.BatteryRemaining}% | Cell1: {cell1}mV | Cur: {msg.CurrentBattery}cA");
+    }
 
-        Buf.Clear();
-        Encoder.WriteV1(msg, sequence: 1, systemId: 1, componentId: 1, output: Buf);
-        await udp.SendAsync(Buf.WrittenMemory, ct);
+    private static void OnGpsRawInt(GpsRawIntMessage msg)
+    {
+        double lat = msg.Lat / 10_000_000.0;
+        double lon = msg.Lon / 10_000_000.0;
+        string fix = msg.FixType switch { 0 => "No Fix", 3 => "3D Fix", _ => msg.FixType.ToString() };
 
-        Console.WriteLine("✅ Sent custom HEARTBEAT once");
+        Console.WriteLine($"📍 GPS        | {fix} | Lat: {lat:F6} | Lon: {lon:F6} | Sats: {msg.SatellitesVisible}");
+    }
+
+    private static void OnAttitude(AttitudeMessage msg)
+    {
+        double roll = msg.Roll * (180.0 / Math.PI);
+        double pitch = msg.Pitch * (180.0 / Math.PI);
+        double yaw = msg.Yaw * (180.0 / Math.PI);
+
+        Console.WriteLine($"🔄 ATTITUDE   | R: {roll,6:F1}° | P: {pitch,6:F1}° | Y: {yaw,6:F1}°");
+    }
+
+    private static void OnStatusText(StatustextMessage msg)
+    {
+        var color = msg.Severity <= 3 ? ConsoleColor.Red : ConsoleColor.Cyan;
+        Console.ForegroundColor = color;
+        Console.WriteLine($"💬 MSG        | {msg.Text}");
+        Console.ResetColor();
     }
 }

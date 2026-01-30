@@ -59,6 +59,26 @@ public ref struct LESpanReader
         return v;
     }
     
+    public ulong ReadUInt64()
+    {
+        this.Ensure(8);
+        ulong v = (ulong)this._src[this._pos] |
+                  ((ulong)this._src[this._pos + 1] << 8) |
+                  ((ulong)this._src[this._pos + 2] << 16) |
+                  ((ulong)this._src[this._pos + 3] << 24) |
+                  ((ulong)this._src[this._pos + 4] << 32) |
+                  ((ulong)this._src[this._pos + 5] << 40) |
+                  ((ulong)this._src[this._pos + 6] << 48) |
+                  ((ulong)this._src[this._pos + 7] << 56);
+        this._pos += 8;
+        return v;
+    }
+
+    public long ReadInt64()
+    {
+        return unchecked((long)this.ReadUInt64());
+    }
+    
     public ReadOnlySpan<byte> ReadBytes(int count)
     {
         this.Ensure(count);
