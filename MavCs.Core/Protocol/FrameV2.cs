@@ -106,11 +106,9 @@ public sealed class FrameV2 : FrameBase
         
         // CRC
         ushort crc = Crc.Reset();
-        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV2Size));
-
+        crc = Crc.AccumulateSpan(crc, header.Slice(1, Constants.HeaderV2Size)); // len..msgid (9 bayt)
         if (len > 0 && frame.Payload is not null)
             crc = Crc.AccumulateSpan(crc, frame.Payload);
-
         if (crcExtraProvider is not null)
             crc = Crc.AccumulateByte(crc, crcExtraProvider(frame.MessageId));
         

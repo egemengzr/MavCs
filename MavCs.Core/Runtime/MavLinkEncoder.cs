@@ -1,5 +1,6 @@
 using System.Buffers;
 using MavCs.Core.Abstractions;
+using MavCs.Core.Messages;
 using MavCs.Core.Protocol;
 using MavCs.Tests.Runtime;
 
@@ -85,6 +86,14 @@ public sealed partial class MavLinkEncoder : IMavLinkEncoder
         Span<byte> payload = stackalloc byte[255];
         int written = serializer.Write(message!, payload);
 
+        if (typeof(TMessage) == typeof(StatustextMessage))
+        {
+            Console.WriteLine($"[DBG] STATUSTEXT written={written} (expected 54)");
+            // quick dump of first bytes
+            var span = payload[..Math.Min(written, 64)];
+            Console.WriteLine("[DBG] payload: " + BitConverter.ToString(span.ToArray()));
+        }
+        
         var frame = new FrameV2
         {
             IncompatFlags = incompatFlags,

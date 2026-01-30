@@ -3,7 +3,7 @@ using MavCs.Core.Messages;
 
 namespace MavCs.Core.Serialization;
 
-public class SysStatusSerializer : IMessageSerializer<SysStatusMessage>
+public sealed class SysStatusSerializer : IMessageSerializer<SysStatusMessage>
 {
     public const int PayloadLength = 31;
 
@@ -11,9 +11,9 @@ public class SysStatusSerializer : IMessageSerializer<SysStatusMessage>
     {
         var w = new LESpanWriter(dst);
         
-        w.WriteUIint32(msg.OnboardControlSensorsPresent);
-        w.WriteUIint32(msg.OnboardControlSensorsEnabled);
-        w.WriteUIint32(msg.OnboardControlSensorsHealth);
+        w.WriteUInt32(msg.OnboardControlSensorsPresent);
+        w.WriteUInt32(msg.OnboardControlSensorsEnabled);
+        w.WriteUInt32(msg.OnboardControlSensorsHealth);
         
         w.WriteUInt16(msg.Load);
         w.WriteUInt16(msg.VoltageBattery);
