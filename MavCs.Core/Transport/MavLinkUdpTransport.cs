@@ -47,7 +47,15 @@ public sealed class MavLinkUdpTransport : IMavTransport
     public async ValueTask<int> SendAsync(ReadOnlyMemory<byte> frame, CancellationToken ct)
     {
         if (_tx is null) return 0;
-           return await _tx.SendAsync(frame, ct);
+
+        try
+        {
+            return await _tx.SendAsync(frame, ct);
+        }
+        catch (SocketException)
+        {
+            return 0; 
+        }
     }
 
     public ValueTask DisposeAsync()
