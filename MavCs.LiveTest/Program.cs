@@ -1,4 +1,6 @@
 ﻿using System.Buffers;
+
+using MavCs.Core.Extensions;
 using MavCs.Core.Messages;
 using MavCs.Core.Registry;
 using MavCs.Core.Runtime;
@@ -9,13 +11,12 @@ namespace MavCs.LiveTest;
 class Program
 {
     private static readonly KnownMessages Registry = new();
-    
     private static readonly MessageDispatcher Dispatcher = new();
 
     static async Task Main()
     {
-        Console.WriteLine("🚀 MavCs Live Listener (Polymorphic Dispatch)");
-        Console.WriteLine("→ Listening on 127.0.0.1:14550...\n");
+        Console.WriteLine("🚀 MavCs Live Test (RX + TX)");
+        Console.WriteLine("→ Listening & Sending on 127.0.0.1:14550...\n");
 
         RegisterHandlers();
 
@@ -27,23 +28,78 @@ class Program
             localPort: 14550, 
             remotePort: 14551
         );
-
         await udp.StartAsync(ct);
 
-        var decoder = new MavLinkDecoder(Registry);
-        var factory = new MavMessageFactory();
+        var connection = new MavlinkConnection(udp, systemId: 255, componentId: 190);
 
-        await foreach (var frameBuffer in udp.ReceiveAsync(ct))
+        var listenTask = Task.Run(async () => 
         {
-            if (decoder.TryReadFrame(frameBuffer.Span, out var header, out _))
+            var decoder = new MavLinkDecoder(Registry);
+            var factory = new MavMessageFactory();
+
+            try
             {
-                if (header is not null && factory.TryDeserializeFrame(header, out var msg) && msg is not null)
+                await foreach (var frameBuffer in udp.ReceiveAsync(ct))
                 {
-                    Dispatcher.Dispatch(msg);
+                    if (decoder.TryReadFrame(frameBuffer.Span, out var header, out _))
+                    {
+                        if (header is not null && factory.TryDeserializeFrame(header, out var msg) && msg is not null)
+                        {
+                            Dispatcher.Dispatch(msg);
+                        }
+                    }
                 }
             }
+            catch (OperationCanceledException) {  }
+        }, ct);
+        
+        try
+        {
+            Console.WriteLine("📤 Sending Test Messages (Heartbeat, Attitude, StatusText)...");
+            
+            while (!ct.IsCancellationRequested)
+            {
+                await connection.SendHeartbeat(type: 6, autopilot: 8, baseMode: 192, ct: ct);
+                
+                var angle = (DateTime.Now.Millisecond / 1000.0) * Math.PI;
+                await connection.SendAttitude(
+                    timeBootMs: (uint)Environment.TickCount,
+                    roll: (float)Math.Sin(angle),
+                    pitch: (float)Math.Cos(angle),
+                    yaw: 0,
+                    ct: ct
+                );
+                
+                if (DateTime.Now.Second % 5 == 0)
+                {
+                    await connection.SendStatusText(
+                        severity: 6, 
+                        text: "Hello from MavCs Extension API!", 
+                        ct: ct
+                    );
+                }
+                
+                if (DateTime.Now.Second % 10 == 0)
+                {
+                    Console.WriteLine("⚡ Sending ARM Command...");
+                    await connection.SendCommandLong(
+                        targetSystem: 1, 
+                        targetComponent: 1, 
+                        command: 400, 
+                        param1: 1,
+                        ct: ct
+                    );
+                    await Task.Delay(1000, ct); 
+                }
+
+                await Task.Delay(1000, ct);
+            }
         }
+        catch (OperationCanceledException) { }
+        
+        await listenTask;
     }
+    
     private static void RegisterHandlers()
     {
         Dispatcher.Subscribe<HeartbeatMessage>(OnHeartbeat);
@@ -65,9 +121,7 @@ class Program
             Console.WriteLine($"🗺️  MISSION    | Waypoint Count: {msg.Count} | Type: {msg.MissionType}"));
             
         Dispatcher.Subscribe<MissionItemIntMessage>(OnMissionItem);
-        
     }
-
     
     private static void OnParamValue(ParamValueMessage msg)
     {

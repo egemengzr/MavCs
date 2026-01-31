@@ -1,6 +1,6 @@
 namespace MavCs.Core.Abstractions;
 
-internal interface IMavTransport : IAsyncDisposable
+public interface IMavTransport : IAsyncDisposable
 {
     Task StartAsync(CancellationToken ct);
 
